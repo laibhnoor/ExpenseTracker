@@ -1,60 +1,94 @@
 import { createContext, useContext, useEffect, useMemo, useState } from 'react'
-
-const AUTH_STORAGE_KEY = 'expense-tracker-auth'
+import api, { AUTH_STORAGE_KEY } from '../lib/api'
 
 const AuthContext = createContext(null)
 
 function AuthProvider({ children }) {
   const [user, setUser] = useState(null)
+  const [token, setToken] = useState('')
+  const [initialized, setInitialized] = useState(false)
 
   useEffect(() => {
     const savedAuth = localStorage.getItem(AUTH_STORAGE_KEY)
     if (!savedAuth) {
+      setInitialized(true)
       return
     }
 
     try {
-      setUser(JSON.parse(savedAuth))
+      const parsed = JSON.parse(savedAuth)
+      setUser(parsed.user ?? null)
+      setToken(parsed.token ?? '')
     } catch {
       localStorage.removeItem(AUTH_STORAGE_KEY)
     }
+
+    setInitialized(true)
   }, [])
 
-  function persistAuth(nextUser) {
+  function persistAuth(nextToken, nextUser) {
+    setToken(nextToken)
     setUser(nextUser)
-    localStorage.setItem(AUTH_STORAGE_KEY, JSON.stringify(nextUser))
+    localStorage.setItem(
+      AUTH_STORAGE_KEY,
+      JSON.stringify({ token: nextToken, user: nextUser }),
+    )
   }
 
-  function login(payload) {
-    persistAuth({
-      id: Date.now(),
-      name: payload.name ?? 'User',
+  async function login(payload) {
+    const response = await api.post('/auth/login', {
       email: payload.email,
+      password: payload.password,
     })
+
+    persistAuth(response.data.token, response.data.user)
+    return response.data.user
   }
 
-  function signup(payload) {
-    persistAuth({
-      id: Date.now(),
+  async function signup(payload) {
+    const response = await api.post('/auth/signup', {
       name: payload.name,
       email: payload.email,
+      password: payload.password,
     })
+
+    persistAuth(response.data.token, response.data.user)
+    return response.data.user
+  }
+
+  async function refreshMe() {
+    if (!token) {
+      return null
+    }
+
+    try {
+      const response = await api.get('/auth/me')
+      persistAuth(token, response.data.user)
+      return response.data.user
+    } catch {
+      logout()
+      return null
+    }
   }
 
   function logout() {
     setUser(null)
+    setToken('')
     localStorage.removeItem(AUTH_STORAGE_KEY)
   }
 
   const value = useMemo(
     () => ({
       user,
+      token,
+      initialized,
       isAuthenticated: Boolean(user),
       login,
       signup,
+      refreshMe,
       logout,
     }),
-    [user],
+    [initialized, token, user],
   )
 
   return <AuthContext.Provider value={value}>{children}</AuthContext.Provider>

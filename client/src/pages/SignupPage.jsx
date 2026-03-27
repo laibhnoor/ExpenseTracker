@@ -3,15 +3,17 @@ import { Link, Navigate, useNavigate } from 'react-router-dom'
 import { useAuth } from '../context/AuthContext'
 
 function SignupPage() {
-  const { signup, isAuthenticated } = useAuth()
+  const { signup, isAuthenticated, initialized } = useAuth()
   const navigate = useNavigate()
   const [formData, setFormData] = useState({
     name: '',
     email: '',
     password: '',
   })
+  const [submitting, setSubmitting] = useState(false)
+  const [errorMessage, setErrorMessage] = useState('')
 
-  if (isAuthenticated) {
+  if (initialized && isAuthenticated) {
     return <Navigate to="/dashboard" replace />
   }
 
@@ -20,14 +22,29 @@ function SignupPage() {
     setFormData((previous) => ({ ...previous, [name]: value }))
   }
 
-  function handleSubmit(event) {
+  async function handleSubmit(event) {
     event.preventDefault()
     if (!formData.name || !formData.email || !formData.password) {
       return
     }
 
-    signup({ name: formData.name, email: formData.email })
-    navigate('/dashboard', { replace: true })
+    setSubmitting(true)
+    setErrorMessage('')
+
+    try {
+      await signup({
+        name: formData.name,
+        email: formData.email,
+        password: formData.password,
+      })
+      navigate('/dashboard', { replace: true })
+    } catch (error) {
+      setErrorMessage(
+        error.response?.data?.message || 'Signup failed. Please try again.',
+      )
+    } finally {
+      setSubmitting(false)
+    }
   }
 
   return (
@@ -80,10 +97,15 @@ function SignupPage() {
 
           <button
             type="submit"
+            disabled={submitting}
             className="mt-2 w-full rounded-xl bg-orange-400 px-5 py-3 font-semibold text-slate-900 transition duration-300 hover:-translate-y-0.5 hover:bg-orange-300"
           >
-            Sign Up
+            {submitting ? 'Creating Account...' : 'Sign Up'}
           </button>
+
+          {errorMessage ? (
+            <p className="text-sm font-medium text-rose-600">{errorMessage}</p>
+          ) : null}
         </form>
 
         <p className="mt-6 text-sm text-slate-500">
