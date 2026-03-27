@@ -25,6 +25,12 @@ function HomePage() {
 
           <div className="fade-up fade-delay-2 mt-8 flex flex-wrap gap-3">
             <Link
+              to="/dashboard"
+              className="rounded-xl border border-slate-300 bg-white/80 px-5 py-3 font-semibold text-slate-800 transition duration-300 hover:-translate-y-0.5 hover:border-slate-500"
+            >
+              View Dashboard
+            </Link>
+            <Link
               to="/signup"
               className="rounded-xl bg-slate-900 px-5 py-3 font-semibold text-white transition duration-300 hover:-translate-y-0.5 hover:bg-black"
             >
