@@ -1,5 +1,6 @@
 import { useState } from 'react'
 import { useNavigate } from 'react-router-dom'
+import api from '../lib/api'
 
 const categoryOptions = ['Food', 'Rent', 'Travel', 'Salary', 'Other']
 
@@ -13,6 +14,8 @@ function AddTransactionPage() {
     notes: '',
   })
   const [errors, setErrors] = useState({})
+  const [submitError, setSubmitError] = useState('')
+  const [submitting, setSubmitting] = useState(false)
 
   function handleChange(event) {
     const { name, value } = event.target
@@ -39,27 +42,37 @@ function AddTransactionPage() {
     return Object.keys(nextErrors).length === 0
   }
 
-  function handleSubmit(event) {
+  async function handleSubmit(event) {
     event.preventDefault()
     if (!validate()) {
       return
     }
 
-    const newTransaction = {
-      id: Date.now(),
-      amount: Number(formData.amount),
-      type: formData.type,
-      category: formData.category,
-      date: formData.date,
-      notes: formData.notes.trim(),
-    }
+    setSubmitting(true)
+    setSubmitError('')
 
-    navigate('/dashboard', {
-      state: {
-        toast: 'Transaction added successfully',
-        newTransaction,
-      },
-    })
+    try {
+      const response = await api.post('/transactions', {
+        amount: Number(formData.amount),
+        type: formData.type,
+        category: formData.category,
+        date: formData.date,
+        notes: formData.notes,
+      })
+
+      navigate('/dashboard', {
+        state: {
+          toast: response.data.message || 'Transaction added successfully',
+          newTransaction: response.data.transaction,
+        },
+      })
+    } catch (error) {
+      setSubmitError(
+        error.response?.data?.message || 'Failed to add transaction. Please try again.',
+      )
+    } finally {
+      setSubmitting(false)
+    }
   }
 
   function handleCancel() {
@@ -160,9 +173,10 @@ function AddTransactionPage() {
           <div className="flex flex-wrap gap-3 pt-2">
             <button
               type="submit"
+              disabled={submitting}
               className="rounded-xl bg-slate-900 px-5 py-3 font-semibold text-white transition duration-300 hover:-translate-y-0.5 hover:bg-black"
             >
-              Submit
+              {submitting ? 'Submitting...' : 'Submit'}
             </button>
             <button
               type="button"
@@ -172,6 +186,10 @@ function AddTransactionPage() {
               Cancel
             </button>
           </div>
+
+          {submitError ? (
+            <p className="text-sm font-medium text-rose-600">{submitError}</p>
+          ) : null}
         </form>
       </section>
     </main>

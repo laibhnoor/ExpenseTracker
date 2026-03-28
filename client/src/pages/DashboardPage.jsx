@@ -1,84 +1,44 @@
 import { useEffect, useMemo, useState } from 'react'
 import { Link, useLocation, useNavigate } from 'react-router-dom'
 import { useAuth } from '../context/AuthContext'
+import api from '../lib/api'
 
-const MOCK_DATA = {
-  month: 'March 2026',
-  income: 5400,
-  expenses: 3675,
-  categories: [
-    { name: 'Rent', amount: 1600, color: '#334155' },
-    { name: 'Food', amount: 840, color: '#0ea5e9' },
-    { name: 'Transport', amount: 430, color: '#10b981' },
-    { name: 'Shopping', amount: 515, color: '#fb923c' },
-    { name: 'Utilities', amount: 290, color: '#6366f1' },
-  ],
-  transactions: [
-    {
-      id: 1,
-      amount: 1200,
-      type: 'Expense',
-      category: 'Food',
-      date: '2026-03-25',
-      notes: 'Groceries for the week',
-    },
-    {
-      id: 2,
-      amount: 5000,
-      type: 'Income',
-      category: 'Salary',
-      date: '2026-03-01',
-      notes: 'Monthly salary',
-    },
-    {
-      id: 3,
-      amount: 1600,
-      type: 'Expense',
-      category: 'Rent',
-      date: '2026-03-03',
-      notes: 'Apartment rent',
-    },
-    {
-      id: 4,
-      amount: 430,
-      type: 'Expense',
-      category: 'Travel',
-      date: '2026-03-12',
-      notes: 'Fuel and tolls',
-    },
-    {
-      id: 5,
-      amount: 700,
-      type: 'Income',
-      category: 'Other',
-      date: '2026-03-18',
-      notes: 'Freelance payment',
-    },
-    {
-      id: 6,
-      amount: 515,
-      type: 'Expense',
-      category: 'Other',
-      date: '2026-03-20',
-      notes: 'Shopping and essentials',
-    },
-    {
-      id: 7,
-      amount: 260,
-      type: 'Expense',
-      category: 'Travel',
-      date: '2026-03-08',
-      notes: '',
-    },
-    {
-      id: 8,
-      amount: 1100,
-      type: 'Expense',
-      category: 'Food',
-      date: '2026-03-26',
-      notes: 'Family dinner and snacks',
-    },
-  ],
+const CATEGORY_COLORS = ['#334155', '#0ea5e9', '#10b981', '#fb923c', '#6366f1', '#8b5cf6']
+
+function buildDashboardData(transactions) {
+  const income = transactions
+    .filter((item) => item.type === 'Income')
+    .reduce((sum, item) => sum + Number(item.amount || 0), 0)
+
+  const expenses = transactions
+    .filter((item) => item.type === 'Expense')
+    .reduce((sum, item) => sum + Number(item.amount || 0), 0)
+
+  const expenseCategoryTotals = transactions
+    .filter((item) => item.type === 'Expense')
+    .reduce((accumulator, item) => {
+      const key = item.category || 'Other'
+      accumulator[key] = (accumulator[key] || 0) + Number(item.amount || 0)
+      return accumulator
+    }, {})
+
+  const categories = Object.entries(expenseCategoryTotals)
+    .map(([name, amount], index) => ({
+      name,
+      amount,
+      color: CATEGORY_COLORS[index % CATEGORY_COLORS.length],
+    }))
+    .sort((a, b) => b.amount - a.amount)
+
+  return {
+    month: new Intl.DateTimeFormat('en-US', {
+      month: 'long',
+      year: 'numeric',
+    }).format(new Date()),
+    income,
+    expenses,
+    categories,
+  }
 }
 
 function formatCurrency(value) {
@@ -308,9 +268,10 @@ function DashboardPage() {
   const navigate = useNavigate()
   const { logout } = useAuth()
   const [loading, setLoading] = useState(true)
-  const [data, setData] = useState(null)
+  const [data, setData] = useState({ month: '', income: 0, expenses: 0, categories: [] })
   const [transactions, setTransactions] = useState([])
   const [toastMessage, setToastMessage] = useState('')
+  const [errorMessage, setErrorMessage] = useState('')
   const [filters, setFilters] = useState({
     type: 'All',
     category: 'All',
@@ -326,21 +287,41 @@ function DashboardPage() {
     navigate('/login', { replace: true })
   }
 
-  useEffect(() => {
-    const timer = setTimeout(() => {
-      setData(MOCK_DATA)
-      setTransactions(MOCK_DATA.transactions)
-      setLoading(false)
-    }, 900)
+  async function loadTransactions() {
+    try {
+      setErrorMessage('')
+      const response = await api.get('/transactions')
+      const fetchedTransactions = response.data.transactions || []
+      setTransactions(fetchedTransactions)
+      setData(buildDashboardData(fetchedTransactions))
+    } catch (error) {
+      setErrorMessage(
+        error.response?.data?.message || 'Failed to load dashboard transactions.',
+      )
 
-    return () => clearTimeout(timer)
+      if (error.response?.status === 401) {
+        handleLogout()
+      }
+    } finally {
+      setLoading(false)
+    }
+  }
+
+  useEffect(() => {
+    loadTransactions()
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [])
 
   useEffect(() => {
     const message = location.state?.toast
     const newTransaction = location.state?.newTransaction
+
     if (newTransaction) {
-      setTransactions((previous) => [newTransaction, ...previous])
+      setTransactions((previous) => {
+        const updated = [newTransaction, ...previous]
+        setData(buildDashboardData(updated))
+        return updated
+      })
     }
 
     if (!message) {
@@ -364,11 +345,11 @@ function DashboardPage() {
     setCurrentPage(1)
   }, [filters])
 
-  const totalExpenses = data?.expenses ?? 0
-  const balance = data ? data.income - data.expenses : 0
-  const topCategory = data?.categories?.reduce(
+  const totalExpenses = data.expenses
+  const balance = data.income - data.expenses
+  const topCategory = data.categories.reduce(
     (top, current) => (current.amount > top.amount ? current : top),
-    data?.categories?.[0] ?? { name: '-', amount: 0 },
+    data.categories[0] ?? { name: '-', amount: 0 },
   )
 
   const availableCategories = useMemo(
@@ -439,7 +420,7 @@ function DashboardPage() {
           <div>
             <h1 className="text-4xl text-slate-900 sm:text-5xl">Dashboard</h1>
             <p className="mt-2 text-slate-600">
-              Monthly overview for {data?.month ?? 'your latest period'}.
+              Monthly overview for {data.month || 'your latest period'}.
             </p>
           </div>
 
@@ -470,6 +451,12 @@ function DashboardPage() {
           <DashboardSkeleton />
         ) : (
           <div className="space-y-6">
+            {errorMessage ? (
+              <div className="rounded-xl border border-rose-200 bg-rose-50 px-4 py-3 text-sm font-semibold text-rose-700">
+                {errorMessage}
+              </div>
+            ) : null}
+
             <section className="grid gap-4 sm:grid-cols-3">
               <SummaryCard
                 label="Income"
@@ -489,7 +476,10 @@ function DashboardPage() {
             </section>
 
             <TopCategoryCard category={topCategory} />
-            <GraphCard categories={data.categories} total={totalExpenses} />
+            <GraphCard
+              categories={data.categories}
+              total={Math.max(totalExpenses, 1)}
+            />
 
             <section className="space-y-4">
               <div>

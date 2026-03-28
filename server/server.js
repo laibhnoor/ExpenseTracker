@@ -67,6 +67,57 @@ function authMiddleware(req, res, next) {
 	}
 }
 
+const categoryMap = {
+	Food: 'FOOD',
+	Rent: 'RENT',
+	Travel: 'TRAVEL',
+	Salary: 'SALARY',
+	Other: 'OTHER',
+}
+
+function normalizeType(input) {
+	const value = String(input || '').toUpperCase()
+	if (value === 'INCOME') {
+		return 'INCOME'
+	}
+	if (value === 'EXPENSE') {
+		return 'EXPENSE'
+	}
+	return null
+}
+
+function normalizeCategory(input) {
+	if (!input) {
+		return null
+	}
+
+	if (categoryMap[input]) {
+		return categoryMap[input]
+	}
+
+	const upper = String(input).toUpperCase()
+	if (Object.values(categoryMap).includes(upper)) {
+		return upper
+	}
+
+	return null
+}
+
+function mapTransactionToClient(transaction) {
+	const categoryLabel =
+		Object.keys(categoryMap).find((key) => categoryMap[key] === transaction.category) ||
+		transaction.category
+
+	return {
+		id: transaction.id,
+		amount: transaction.amount,
+		type: transaction.type === 'INCOME' ? 'Income' : 'Expense',
+		category: categoryLabel,
+		date: transaction.date.toISOString().slice(0, 10),
+		notes: transaction.notes || '',
+	}
+}
+
 app.get('/api/health', (_req, res) => {
 	return res.json({ ok: true })
 })
@@ -163,6 +214,70 @@ app.get('/api/auth/me', authMiddleware, async (req, res) => {
 		return res.json({ user })
 	} catch {
 		return res.status(500).json({ message: 'Failed to load user.' })
+	}
+})
+
+app.post('/api/transactions', authMiddleware, async (req, res) => {
+	try {
+		const { amount, type, category, date, notes } = req.body
+
+		const numericAmount = Number(amount)
+		const normalizedType = normalizeType(type)
+		const normalizedCategory = normalizeCategory(category)
+
+		if (!Number.isFinite(numericAmount) || numericAmount <= 0) {
+			return res.status(400).json({ message: 'Amount must be greater than 0.' })
+		}
+
+		if (!normalizedType) {
+			return res.status(400).json({ message: 'Type must be Income or Expense.' })
+		}
+
+		if (!normalizedCategory) {
+			return res.status(400).json({ message: 'Please select a valid category.' })
+		}
+
+		if (!date) {
+			return res.status(400).json({ message: 'Date is required.' })
+		}
+
+		const transactionDate = new Date(date)
+		if (Number.isNaN(transactionDate.getTime())) {
+			return res.status(400).json({ message: 'Invalid date.' })
+		}
+
+		const transaction = await prisma.transaction.create({
+			data: {
+				amount: numericAmount,
+				type: normalizedType,
+				category: normalizedCategory,
+				date: transactionDate,
+				notes: notes?.trim() || null,
+				userId: req.user.userId,
+			},
+		})
+
+		return res.status(201).json({
+			message: 'Transaction added successfully',
+			transaction: mapTransactionToClient(transaction),
+		})
+	} catch {
+		return res.status(500).json({ message: 'Failed to add transaction.' })
+	}
+})
+
+app.get('/api/transactions', authMiddleware, async (req, res) => {
+	try {
+		const transactions = await prisma.transaction.findMany({
+			where: { userId: req.user.userId },
+			orderBy: { date: 'desc' },
+		})
+
+		return res.json({
+			transactions: transactions.map(mapTransactionToClient),
+		})
+	} catch {
+		return res.status(500).json({ message: 'Failed to load transactions.' })
 	}
 })
 
