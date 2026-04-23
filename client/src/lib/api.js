@@ -1,9 +1,10 @@
 import axios from 'axios'
 
 const AUTH_STORAGE_KEY = 'expense-tracker-auth'
+const defaultApiBaseURL = import.meta.env.PROD ? '/api' : 'http://localhost:5000/api'
 
 const api = axios.create({
-  baseURL: import.meta.env.VITE_API_URL || 'http://localhost:5000/api',
+  baseURL: import.meta.env.VITE_API_URL || defaultApiBaseURL,
 })
 
 api.interceptors.request.use((config) => {

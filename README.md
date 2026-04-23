@@ -54,7 +54,7 @@ npm install
 npm run dev
 ```
 
-## Render Deployment (API + Client)
+## Render Deployment (Single Service)
 
 This repository includes a Render Blueprint file at `render.yaml`.
 
@@ -71,20 +71,15 @@ In `server/package.json`, deployment uses:
 1. Push this repo to GitHub.
 2. In Render, choose New +, then Blueprint.
 3. Select your repository so Render reads `render.yaml`.
-4. Render creates two services:
-	- `expense-tracker-api` (Node web service)
-	- `expense-tracker-client` (static site)
-5. Set backend environment variables in Render for `expense-tracker-api`:
+4. Render creates one web service: `expense-tracker-app`.
+5. Set environment variables in Render for that service:
 	- `DATABASE_URL` (Neon connection string)
 	- `JWT_SECRET`
-	- `CLIENT_ORIGIN` (your frontend Render URL)
 	- `ALLOWED_ORIGINS` (optional comma-separated list)
-6. Set frontend environment variable in Render for `expense-tracker-client`:
-	- `VITE_API_URL` = `https://<your-backend-service>.onrender.com/api`
-7. Trigger deploy.
-8. Verify API health at:
-	- `https://<your-backend-service>.onrender.com/api/health`
-9. Open your frontend URL and test signup/login and transactions.
+6. Trigger deploy.
+7. Verify API health at:
+	- `https://<your-service>.onrender.com/api/health`
+8. Open your service root URL and test signup/login and transactions.
 
 ## Notes for Neon
 

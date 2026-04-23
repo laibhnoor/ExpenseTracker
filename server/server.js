@@ -1,6 +1,7 @@
 require('dotenv').config()
 
 const express = require('express')
+const path = require('path')
 const cors = require('cors')
 const { corsOptions } = require('./config/cors')
 const authRoutes = require('./routes/authRoutes')
@@ -24,6 +25,16 @@ app.get('/api/health', (_req, res) => {
 
 app.use('/api/auth', authRoutes)
 app.use('/api/transactions', transactionRoutes)
+
+if (process.env.NODE_ENV === 'production') {
+	const clientDistPath = path.join(__dirname, '..', 'client', 'dist')
+
+	app.use(express.static(clientDistPath))
+
+	app.get(/^(?!\/api).*/, (_req, res) => {
+		return res.sendFile(path.join(clientDistPath, 'index.html'))
+	})
+}
 
 app.use(notFound)
 app.use(errorHandler)

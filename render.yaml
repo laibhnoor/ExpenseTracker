@@ -1,11 +1,11 @@
 services:
   - type: web
-    name: expense-tracker-api
+    name: expense-tracker-app
     env: node
-    rootDir: server
+    rootDir: .
     plan: free
-    buildCommand: npm install
-    startCommand: npm run start:render
+    buildCommand: npm run render:build
+    startCommand: npm run render:start
     healthCheckPath: /api/health
     envVars:
       - key: NODE_ENV
@@ -16,16 +16,5 @@ services:
         sync: false
       - key: JWT_SECRET
         sync: false
-      - key: CLIENT_ORIGIN
-        sync: false
       - key: ALLOWED_ORIGINS
-        sync: false
-
-  - type: static
-    name: expense-tracker-client
-    rootDir: client
-    buildCommand: npm install && npm run build
-    staticPublishPath: dist
-    envVars:
-      - key: VITE_API_URL
         sync: false
