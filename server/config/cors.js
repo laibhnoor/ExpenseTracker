@@ -10,10 +10,15 @@ const allowedOrigins = new Set([
   CLIENT_ORIGIN,
 ])
 
+function isRenderOrigin(origin) {
+  return /^https:\/\/[a-z0-9-]+\.onrender\.com$/i.test(String(origin || ''))
+}
+
 function corsOrigin(origin, callback) {
   const isLocalhostOrigin = /^http:\/\/localhost:\d+$/.test(String(origin || ''))
+  const allowRenderOrigin = process.env.NODE_ENV === 'production' && isRenderOrigin(origin)
 
-  if (!origin || isLocalhostOrigin || allowedOrigins.has(origin)) {
+  if (!origin || isLocalhostOrigin || allowedOrigins.has(origin) || allowRenderOrigin) {
     return callback(null, true)
   }
 
