@@ -2,7 +2,7 @@
   "name": "expense-tracker",
   "private": true,
   "scripts": {
-    "render:build": "npm --prefix server install && npm --prefix client install && npm --prefix client run build",
+    "render:build": "npm --prefix server install && npm --prefix client install --include=dev && npm --prefix client run build",
     "render:start": "npm --prefix server run start:render",
     "dev:server": "npm --prefix server run dev",
     "dev:client": "npm --prefix client run dev"
